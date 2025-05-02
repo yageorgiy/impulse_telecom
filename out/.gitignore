@@ -1,2 +1,6 @@
 !.gitignore
+!config.xml
+!delta.json
+!meta.json
+!res_patched_config.json
 *

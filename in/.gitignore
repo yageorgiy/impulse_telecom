@@ -1,2 +1,5 @@
 !.gitignore
+!config.json
+!impulse_test_input.xml
+!patched_config.json
 *
