@@ -20,3 +20,8 @@ Setup pre-commit rules for git:
 poetry env activate
 pre-commit install
 ```
+
+Run pytests:
+```bash
+poetry run pytest -v -s
+```

@@ -28,6 +28,13 @@ class MetaDescriptionEncoder(json.JSONEncoder):
         if isinstance(obj, MetaDescription):
             dict = obj.__dict__
 
+            # replacement from "class_" to "class"
+            # TODO: move up recreated class item
+            if "class_" in dict:
+                contents = dict["class_"]
+                dict["class"] = contents
+                del dict["class_"]
+
             if "max" in dict and dict["max"] == "-":
                 del dict["max"]
 
@@ -70,7 +77,7 @@ def process(
     patched_config: dict[str, int],
     config: dict[str, int],
     impulse_test_input_tree: ET.ElementTree,
-) -> None:
+) -> tuple[bytes, str]:
     xml_root_tree: ET.Element = impulse_test_input_tree.getroot()
     xml_new_root: ET.Element | None = None
     xml_new_classes_dict: dict[str, ET.Element] = dict()
@@ -124,7 +131,7 @@ def process(
 
     if xml_new_root is None:
         print("No root found.")
-        return
+        return b"", ""
 
     print("Built base.")
     # ET.dump(xml_new_root)
@@ -175,7 +182,7 @@ def process(
     print("Built connections.")
 
     # XML export
-    rough_xml_contents: bytes = ET.tostring(
+    return_config_xml: bytes = ET.tostring(
         xml_new_root,
         encoding="utf-8",
         # Example file elements are not shortened
@@ -183,25 +190,20 @@ def process(
     )
     # TODO: prettify and use short empty elements
     # parsed = minidom.parseString(rough_xml_contents)
-    with open("out/config.xml", mode="b+w") as out_file:
-        out_file.write(rough_xml_contents)
-        # out_file.write(parsed.toprettyxml(indent="\t"))
-        print("Written to out/config.xml.")
+    # out_file.write(parsed.toprettyxml(indent="\t"))
 
-    # JSON meta.json export
-    with open("out/meta.json", mode="w") as out_file:
-        print(json_meta)
-        out_file.write(json.dumps(
-            # From dict to list
-            list(json_meta.values()),
-            # Allow utf-8 characters
-            ensure_ascii=False,
-            # Pretty print
-            indent=4,
-            # Custom encoder for dataclasses
-            cls=MetaDescriptionEncoder
-        ))
-        print("Written to out/meta.json.")
+    return_meta_json = json.dumps(
+        # From dict to list
+        list(json_meta.values()),
+        # Allow utf-8 characters
+        ensure_ascii=False,
+        # Pretty print
+        indent=4,
+        # Custom encoder for dataclasses
+        cls=MetaDescriptionEncoder
+    )
+
+    return return_config_xml, return_meta_json
 
 
 def main() -> None:
@@ -215,11 +217,20 @@ def main() -> None:
             "in/impulse_test_input.xml", "r", encoding="utf-8"
         ) as impulse_test_input_file,
     ):
-        process(
+        (config_xml, meta_json) = process(
             json.load(patched),
             json.load(config),
             ET.parse(impulse_test_input_file),
         )
+
+        with open("out/config.xml", mode="b+w") as out_file:
+            out_file.write(config_xml)
+            print("Written to out/config.xml.")
+
+        with open("out/meta.json", mode="w") as out_file:
+            out_file.write(meta_json)
+            print("Written to out/meta.json.")
+
     # except:
     #     print('Got exception.', traceback.format_exc())
     pass
