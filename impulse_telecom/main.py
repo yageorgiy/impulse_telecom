@@ -1,4 +1,5 @@
 import json
+# import os
 # import traceback
 import xml.etree.ElementTree as ET
 
@@ -103,6 +104,8 @@ def process(
 
 def main() -> None:
     # try:
+    # print(os.path.dirname(os.path.realpath(__file__)))
+    # print(os.getcwd())
     with (
         open("in/config.json", "r", encoding="utf-8") as config,
         open("in/patched_config.json", "r", encoding="utf-8") as patched,
