@@ -2,7 +2,7 @@ import json
 # import os
 import xml.etree.ElementTree as ET
 
-from impulse_telecom.main import process
+from main import process
 
 # print(os.path.dirname(os.path.realpath(__file__)))
 # print(os.getcwd())

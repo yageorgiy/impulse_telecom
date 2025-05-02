@@ -6,10 +6,10 @@ authors = [
     {name = "Yankovskiy Georgiy",email = "admin@yageorgiy.ru"}
 ]
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 
 [tool.poetry.dependencies]
-python = "3.13.3"
+python = "^3.11"
 numpy = "^2.2.5"
 pytest-mock = "^3.14.0"
 
@@ -21,7 +21,7 @@ isort = "^6.0.1"
 pre-commit = "^4.2.0"
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "^3.11"
 strict = true
 ignore_missing_imports = true
 
@@ -30,4 +30,4 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-main = "impulse_telecom.main:main"
+main = "main:main"
