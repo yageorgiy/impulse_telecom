@@ -35,8 +35,7 @@ def compare_xml_elements_builtin(
     return True
 
 
-def test_validate_from_example() -> None:
-    p: str = 'tests/payloads/example'
+def run(p: str) -> None:
     with (
         # ACTUAL payloads
         open("{}/config.json".format(p), "r", encoding="utf-8") as config,
@@ -60,17 +59,36 @@ def test_validate_from_example() -> None:
             "r",
             encoding="utf-8"
         ) as expected_meta,
+        open(
+            "{}/res_patched_config.json".format(p),
+            "r",
+            encoding="utf-8"
+        ) as expected_res_patched_config,
+        open(
+            "{}/delta.json".format(p),
+            "r",
+            encoding="utf-8"
+        ) as expected_delta,
     ):
-        (actual_config_contents, actual_meta_contents) = process(
-            json.load(patched),
+        (
+            actual_config_contents,
+            actual_meta_contents,
+            actual_delta,
+            actual_res_config_json
+        ) = process(
             json.load(config),
+            json.load(patched),
             ET.parse(impulse_test_input_file),
         )
 
         expected_config_xml_contents: str = expected_config.read()
         expected_meta_contents: str = expected_meta.read()
+        expected_res_contents: str = expected_res_patched_config.read()
+        expected_delta_contents: str = expected_delta.read()
 
+        #
         # Compare config.xml
+        #
         actual_config_tree = ET.fromstring(actual_config_contents)
         expected_config_tree = ET.fromstring(expected_config_xml_contents)
 
@@ -79,7 +97,9 @@ def test_validate_from_example() -> None:
             actual_config_tree
         )
 
+        #
         # Compare meta.json
+        #
         expected_meta_json = json.loads(expected_meta_contents)
         actual_meta_json = json.loads(actual_meta_contents)
 
@@ -88,3 +108,31 @@ def test_validate_from_example() -> None:
         actual_meta_json.sort(key=lambda j: j["class"], reverse=True)
 
         assert expected_meta_json == actual_meta_json
+
+        #
+        # Compare res_patched_config.json
+        #
+        expected_res_json = json.loads(expected_res_contents)
+        actual_res_json = json.loads(actual_res_config_json)
+
+        assert expected_res_json == actual_res_json
+
+        #
+        # Compare delta.json
+        #
+        expected_delta_json = json.loads(expected_delta_contents)
+        actual_delta_json = json.loads(actual_delta)
+
+        # Don't check order
+        # expected_delta_json.sort(key=lambda j: j["class"], reverse=True)
+        # actual_delta_json.sort(key=lambda j: j["class"], reverse=True)
+
+        assert expected_delta_json == actual_delta_json
+
+
+def test_validate_from_example() -> None:
+    run('tests/payloads/example')
+
+
+def test_validate_from_example1() -> None:
+    run('tests/payloads/example1')

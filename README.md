@@ -8,6 +8,15 @@ poetry install
 poetry run main
 ```
 
+Or use python directly:
+```bash
+python main.py
+```
+
+Sample result:
+
+![img_1.png](docs/img_1.png)
+
 ## Development
 
 Install dependencies with poetry:
@@ -25,3 +34,7 @@ Run pytests:
 ```bash
 poetry run pytest -v -s
 ```
+
+Sample result:
+
+![img.png](docs/img.png)

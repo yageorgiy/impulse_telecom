@@ -1,3 +1,4 @@
+import copy
 import json
 import re
 # import os
@@ -5,6 +6,19 @@ import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from typing import Any
+
+
+@dataclass
+class ConfigUpdate:
+    key: str
+    from_: str
+    to: str
+
+
+@dataclass
+class ConfigAddition:
+    key: str
+    value: str
 
 
 @dataclass
@@ -23,25 +37,34 @@ class MetaDescription:
     parameters: list[MetaDescriptionParameter]
 
 
+class ConfigEncoder(json.JSONEncoder):
+    def default(self, obj: Any) -> Any:
+        if isinstance(obj, ConfigUpdate):
+            d = obj.__dict__
+            ret: dict[str, Any] = dict()
+            ret['key'] = d['key']
+            ret['from'] = d['from_']
+            ret['to'] = d['to']
+            return ret
+        if isinstance(obj, ConfigAddition):
+            return obj.__dict__
+        return json.JSONEncoder.default(self, obj)
+
+
 class MetaDescriptionEncoder(json.JSONEncoder):
     def default(self, obj: Any) -> Any:
         if isinstance(obj, MetaDescription):
-            dict = obj.__dict__
-
-            # replacement from "class_" to "class"
-            # TODO: move up recreated class item
-            if "class_" in dict:
-                contents = dict["class_"]
-                dict["class"] = contents
-                del dict["class_"]
-
-            if "max" in dict and dict["max"] == "-":
-                del dict["max"]
-
-            if "min" in dict and dict["min"] == "-":
-                del dict["min"]
-
-            return dict
+            d = obj.__dict__
+            ret: dict[str, Any] = dict()
+            ret["class"] = d["class_"]
+            ret["documentation"] = d["documentation"]
+            ret["isRoot"] = d["isRoot"]
+            if d["max"] != "-":
+                ret["max"] = d["max"]
+            if d["min"] != "-":
+                ret["min"] = d["min"]
+            ret["parameters"] = d["parameters"]
+            return ret
         if isinstance(obj, MetaDescriptionParameter):
             return obj.__dict__
         return json.JSONEncoder.default(self, obj)
@@ -74,10 +97,69 @@ def build_child_attributes(
 
 
 def process(
-    patched_config: dict[str, int],
-    config: dict[str, int],
+    config: dict[str, str],
+    patched_config: dict[str, str],
     impulse_test_input_tree: ET.ElementTree,
-) -> tuple[bytes, str]:
+) -> tuple[bytes, str, str, str]:
+    #
+    # config / patched_config processing
+    #
+    final_json: dict[str, str] = copy.deepcopy(config)
+    updates: list[ConfigUpdate] = []
+    deletions: list[str] = []
+    additions: list[ConfigAddition] = []
+
+    for key, value in patched_config.items():
+        # New item
+        if key not in config:
+            additions.append(ConfigAddition(
+                key=key,
+                value=value
+            ))
+            final_json[key] = value
+        else:
+            # Updated item
+            if config[key] != value:
+                updates.append(ConfigUpdate(
+                    key=key,
+                    from_=config[key],
+                    to=value
+                ))
+                final_json[key] = value
+            del config[key]
+
+    # Find for removed items
+    for key, value in config.items():
+        deletions.append(key)
+        del final_json[key]
+
+    return_delta: str = json.dumps(
+        {
+            "additions": additions,
+            "deletions": deletions,
+            "updates": updates
+        },
+        # Allow utf-8 characters
+        ensure_ascii=False,
+        # Pretty print
+        indent=4,
+        # Custom encoder for dataclasses
+        cls=ConfigEncoder
+    )
+
+    return_res_config: str = json.dumps(
+        # From dict to list
+        final_json,
+        # Allow utf-8 characters
+        ensure_ascii=False,
+        # Pretty print
+        indent=4
+    )
+
+    #
+    # config.xml and meta.json processing
+    #
+
     xml_root_tree: ET.Element = impulse_test_input_tree.getroot()
     xml_new_root: ET.Element | None = None
     xml_new_classes_dict: dict[str, ET.Element] = dict()
@@ -131,10 +213,9 @@ def process(
 
     if xml_new_root is None:
         print("No root found.")
-        return b"", ""
+        return b"", "", return_delta, return_res_config
 
     print("Built base.")
-    # ET.dump(xml_new_root)
 
     # Process Aggregations
     for aggregation_child in xml_aggregation_list:
@@ -158,8 +239,6 @@ def process(
         source_multiplicity: str = (
             aggregation_child.get("sourceMultiplicity", "1"))
         # Trying to find "number..number" in attribute
-        # match: re.Match[str] | None = (
-        # re.search(r'([0-9]+)\.\.([0-9]+)', source_multiplicity))
         match: list[tuple[str, str]] = (
             re.findall(r'([0-9]+)\.\.([0-9]+)', source_multiplicity))
 
@@ -203,7 +282,8 @@ def process(
         cls=MetaDescriptionEncoder
     )
 
-    return return_config_xml, return_meta_json
+    return (return_config_xml, return_meta_json,
+            return_delta, return_res_config)
 
 
 def main() -> None:
@@ -217,9 +297,14 @@ def main() -> None:
             "in/impulse_test_input.xml", "r", encoding="utf-8"
         ) as impulse_test_input_file,
     ):
-        (config_xml, meta_json) = process(
-            json.load(patched),
+        (
+            config_xml,
+            meta_json,
+            delta_json,
+            res_config_json
+        ) = process(
             json.load(config),
+            json.load(patched),
             ET.parse(impulse_test_input_file),
         )
 
@@ -230,6 +315,14 @@ def main() -> None:
         with open("out/meta.json", mode="w") as out_file:
             out_file.write(meta_json)
             print("Written to out/meta.json.")
+
+        with open("out/delta.json", mode="w") as out_file:
+            out_file.write(delta_json)
+            print("Written to out/delta.json.")
+
+        with open("out/res_patched_config.json", mode="w") as out_file:
+            out_file.write(res_config_json)
+            print("Written to out/res_patched_config.json.")
 
     # except:
     #     print('Got exception.', traceback.format_exc())

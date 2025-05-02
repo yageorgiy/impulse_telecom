@@ -1,0 +1,48 @@
+{
+    "additions": [
+        {
+            "key": "added_param0",
+            "value": "2471"
+        },
+        {
+            "key": "added_param1",
+            "value": "2946"
+        },
+        {
+            "key": "added_param2",
+            "value": "2701"
+        },
+        {
+            "key": "added_param3",
+            "value": "2733"
+        }
+    ],
+    "deletions": [
+        "param0",
+        "param3",
+        "param6",
+        "param7"
+    ],
+    "updates": [
+        {
+            "key": "param1",
+            "from": "475",
+            "to": "1672"
+        },
+        {
+            "key": "param2",
+            "from": "617",
+            "to": "1740"
+        },
+        {
+            "key": "param8",
+            "from": "153",
+            "to": "1058"
+        },
+        {
+            "key": "param9",
+            "from": "431",
+            "to": "1722"
+        }
+    ]
+}
