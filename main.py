@@ -36,6 +36,10 @@ class MetaDescription:
     min: str
     parameters: list[MetaDescriptionParameter]
 
+    el: ET.Element
+    # 'MetaDescription' for fixing Unresolved reference
+    children: list['MetaDescription']
+
 
 class ConfigEncoder(json.JSONEncoder):
     def default(self, obj: Any) -> Any:
@@ -68,6 +72,21 @@ class MetaDescriptionEncoder(json.JSONEncoder):
         if isinstance(obj, MetaDescriptionParameter):
             return obj.__dict__
         return json.JSONEncoder.default(self, obj)
+
+
+def postorder_traversal(
+    element: MetaDescription,
+    json_meta: dict[str, MetaDescription]
+) -> None:
+    # Skip if not found
+    if element is None:
+        return
+
+    for child in (element.children):
+        postorder_traversal(child, json_meta)
+
+    # Element validating
+    json_meta[element.class_] = element
 
 
 def build_child_attributes(
@@ -157,16 +176,14 @@ def process(
     )
 
     #
-    # config.xml and meta.json processing
+    # config.xml processing
     #
 
     xml_root_tree: ET.Element = impulse_test_input_tree.getroot()
-    xml_new_root: ET.Element | None = None
-    xml_new_classes_dict: dict[str, ET.Element] = dict()
+    xml_new_root: MetaDescription | None = None
+    xml_new_classes_dict: dict[str, MetaDescription] = dict()
     xml_classes_list: list[ET.Element] = []
     xml_aggregation_list: list[ET.Element] = []
-
-    json_meta: dict[str, MetaDescription] = dict()
 
     # Find all tags with Classes and Aggregations
     # Put items to lists again to avoid incorrect XML-order
@@ -184,32 +201,36 @@ def process(
     for class_child in xml_classes_list:
         attrib: dict[str, str] = class_child.attrib
         class_name: str = attrib.get("name", "_")
-        isRoot: bool = attrib.get("isRoot") == "true"
+        is_root: bool = attrib.get("isRoot") == "true"
 
         if class_name in xml_new_classes_dict:
             print("Warning! Got duplication.", class_child)
             continue
 
-        e = ET.Element(class_name)
-        xml_new_classes_dict[class_name] = e
-
-        if isRoot and xml_new_root is None:
-            xml_new_root = e
-
-        # Building basic MetaDescription for meta.json
         json_meta_parameters: list[MetaDescriptionParameter] = []
-        build_child_attributes(class_child, e, json_meta_parameters)
 
-        json_meta[class_name] = MetaDescription(
+        e = ET.Element(class_name)
+        node = MetaDescription(
             class_=class_name,
             parameters=json_meta_parameters,
-            isRoot=isRoot,
+            isRoot=is_root,
             documentation=attrib.get("documentation", ""),
             # placeholder, calculated later, should be ignored if "-"
             max="-",
             # placeholder, calculated later, should be ignored if "-"
-            min="-"
+            min="-",
+            el=e,
+            # Filled later
+            children=[]
         )
+
+        xml_new_classes_dict[class_name] = node
+
+        if is_root and xml_new_root is None:
+            xml_new_root = node
+
+        # Building basic MetaDescription for meta.json
+        build_child_attributes(class_child, e, json_meta_parameters)
 
     if xml_new_root is None:
         print("No root found.")
@@ -229,9 +250,12 @@ def process(
                 target not in xml_new_classes_dict):
             continue
 
-        xml_new_classes_dict[target].append(xml_new_classes_dict[source])
+        source_entry: MetaDescription = xml_new_classes_dict[source]
+        target_entry: MetaDescription = xml_new_classes_dict[target]
 
-        json_meta[target].parameters.append(MetaDescriptionParameter(
+        target_entry.children.append(source_entry)
+        target_entry.el.append(source_entry.el)
+        target_entry.parameters.append(MetaDescriptionParameter(
             name=source,
             type="class"
         ))
@@ -255,14 +279,14 @@ def process(
             _min = source_multiplicity
             _max = source_multiplicity
 
-        json_meta[source].max = _max
-        json_meta[source].min = _min
+        source_entry.max = _max
+        source_entry.min = _min
 
     print("Built connections.")
 
     # XML export
     return_config_xml: bytes = ET.tostring(
-        xml_new_root,
+        xml_new_root.el,
         encoding="utf-8",
         # Example file elements are not shortened
         short_empty_elements=False,
@@ -270,6 +294,14 @@ def process(
     # TODO: prettify and use short empty elements
     # parsed = minidom.parseString(rough_xml_contents)
     # out_file.write(parsed.toprettyxml(indent="\t"))
+
+    #
+    # meta.json processing
+    #
+    json_meta: dict[str, MetaDescription] = dict()
+
+    # Running from right branch to left, then root
+    postorder_traversal(xml_new_root, json_meta)
 
     return_meta_json = json.dumps(
         # From dict to list

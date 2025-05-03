@@ -103,10 +103,6 @@ def run(p: str) -> None:
         expected_meta_json = json.loads(expected_meta_contents)
         actual_meta_json = json.loads(actual_meta_contents)
 
-        # Don't check order
-        expected_meta_json.sort(key=lambda j: j["class"], reverse=True)
-        actual_meta_json.sort(key=lambda j: j["class"], reverse=True)
-
         assert expected_meta_json == actual_meta_json
 
         #
@@ -122,10 +118,6 @@ def run(p: str) -> None:
         #
         expected_delta_json = json.loads(expected_delta_contents)
         actual_delta_json = json.loads(actual_delta)
-
-        # Don't check order
-        # expected_delta_json.sort(key=lambda j: j["class"], reverse=True)
-        # actual_delta_json.sort(key=lambda j: j["class"], reverse=True)
 
         assert expected_delta_json == actual_delta_json
 
