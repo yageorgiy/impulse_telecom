@@ -282,6 +282,9 @@ def build_config_xml(
 
     print("Built connections.")
 
+    # Pretty XML
+    ET.indent(xml_new_root.el, space="\t", level=0)
+
     # XML export
     return_config_xml: bytes = ET.tostring(
         xml_new_root.el,
