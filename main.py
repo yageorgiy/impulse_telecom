@@ -1,11 +1,12 @@
 import copy
 import json
 import re
-# import os
-# import traceback
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from typing import Any
+
+# import os
+# import traceback
 
 
 @dataclass
@@ -35,7 +36,6 @@ class MetaDescription:
     max: str
     min: str
     parameters: list[MetaDescriptionParameter]
-
     el: ET.Element
     # 'MetaDescription' for fixing Unresolved reference
     children: list['MetaDescription']
@@ -82,7 +82,7 @@ def postorder_traversal(
     if element is None:
         return
 
-    for child in (element.children):
+    for child in element.children:
         postorder_traversal(child, json_meta)
 
     # Element validating
@@ -115,14 +115,10 @@ def build_child_attributes(
         ))
 
 
-def process(
+def build_res_patched_config(
     config: dict[str, str],
     patched_config: dict[str, str],
-    impulse_test_input_tree: ET.ElementTree,
-) -> tuple[bytes, str, str, str]:
-    #
-    # config / patched_config processing
-    #
+) -> tuple[str, str]:
     final_json: dict[str, str] = copy.deepcopy(config)
     updates: list[ConfigUpdate] = []
     deletions: list[str] = []
@@ -175,10 +171,12 @@ def process(
         indent=4
     )
 
-    #
-    # config.xml processing
-    #
+    return return_delta, return_res_config
 
+
+def build_config_xml(
+    impulse_test_input_tree: ET.ElementTree
+) -> tuple[MetaDescription | None, bytes]:
     xml_root_tree: ET.Element = impulse_test_input_tree.getroot()
     xml_new_root: MetaDescription | None = None
     xml_new_classes_dict: dict[str, MetaDescription] = dict()
@@ -234,7 +232,7 @@ def process(
 
     if xml_new_root is None:
         print("No root found.")
-        return b"", "", return_delta, return_res_config
+        return None, b""
 
     print("Built base.")
 
@@ -291,9 +289,29 @@ def process(
         # Example file elements are not shortened
         short_empty_elements=False,
     )
-    # TODO: prettify and use short empty elements
-    # parsed = minidom.parseString(rough_xml_contents)
-    # out_file.write(parsed.toprettyxml(indent="\t"))
+
+    return xml_new_root, return_config_xml
+
+
+def process(
+    config: dict[str, str],
+    patched_config: dict[str, str],
+    impulse_test_input_tree: ET.ElementTree,
+) -> tuple[bytes, str, str, str]:
+    #
+    # config / patched_config processing
+    #
+    return_delta, return_res_config = (
+        build_res_patched_config(config, patched_config))
+
+    #
+    # config.xml processing
+    #
+    xml_new_root, return_config_xml = (
+        build_config_xml(impulse_test_input_tree))
+
+    if xml_new_root is None:
+        return b"", "", return_delta, return_res_config
 
     #
     # meta.json processing
